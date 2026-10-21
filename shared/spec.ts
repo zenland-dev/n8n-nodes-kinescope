@@ -19,7 +19,7 @@ export interface Operation {
 	/** Stored in workflows. Never rename once published. */
 	value: string;
 	name: string;
-	/** Becomes the tool name an AI agent sees, e.g. "Send a message". */
+	/** Becomes the tool name an AI agent sees, e.g. "Create a room". */
 	action: string;
 	/** Printed verbatim in n8n's node catalog. */
 	description: string;
