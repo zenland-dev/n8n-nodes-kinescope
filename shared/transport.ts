@@ -56,7 +56,16 @@ export interface KinescopeRequestOptions {
 	maxAttempts?: number;
 	/** Read the answer as text rather than JSON, for the transcript file. */
 	text?: boolean;
+	/** Send to the upload host rather than the API host. */
+	uploader?: boolean;
+	/** Extra request headers, e.g. the X-Video-* metadata of an upload. */
+	headers?: Record<string, string>;
+	/** A body sent as bytes, e.g. a multipart form; the answer is still read as JSON. */
+	rawBody?: { data: Buffer; contentType: string };
 }
+
+/** The host uploads go to. Like the API host, it is fixed: nothing a user types can change it. */
+export const UPLOADER_ORIGIN = 'https://uploader.kinescope.io';
 
 /** A short, stable name for a token, for caches and the rate limiter. Never the token itself. */
 export function tokenFingerprint(token: string): string {
@@ -118,19 +127,26 @@ export async function kinescopeRequest(
 	const route = apiPath(path);
 	const label = `${method} ${route}`;
 
+	// Bytes go out unencoded, so the answer comes back as text and is parsed below.
+	const asText = options.text === true || options.rawBody !== undefined;
 	const request: IHttpRequestOptions = {
 		method,
-		url: `${API_ORIGIN}${route}`,
-		json: options.text !== true,
+		url: `${options.uploader === true ? UPLOADER_ORIGIN : API_ORIGIN}${route}`,
+		json: !asText,
 		returnFullResponse: true,
 		ignoreHttpStatusErrors: true,
 		// Kinescope's list filters are written status[]=a&status[]=b.
 		arrayFormat: 'brackets',
 		headers: {
 			Accept: options.text === true ? 'text/plain, application/json' : 'application/json',
+			...(options.headers ?? {}),
 		},
 	};
-	if (options.text === true) request.encoding = 'text';
+	if (asText) request.encoding = 'text';
+	if (options.rawBody !== undefined) {
+		request.body = options.rawBody.data;
+		(request.headers as IDataObject)['Content-Type'] = options.rawBody.contentType;
+	}
 	if (!isEmpty(options.qs)) request.qs = options.qs;
 	if (options.body !== undefined) request.body = options.body as IDataObject;
 
@@ -163,8 +179,12 @@ export async function kinescopeRequest(
 
 		const status = Number(response.statusCode) || 0;
 		let body: unknown = response.body;
-		// An error answer to a text request still comes as JSON text.
-		if (options.text === true && status >= 400 && typeof body === 'string') {
+		// An error answer to a text request still comes as JSON text, and so does every
+		// answer to a request whose body went out as bytes.
+		if (
+			typeof body === 'string' &&
+			((options.text === true && status >= 400) || options.rawBody !== undefined)
+		) {
 			try {
 				body = JSON.parse(body) as unknown;
 			} catch {

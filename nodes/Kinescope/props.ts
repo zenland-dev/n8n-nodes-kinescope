@@ -68,3 +68,32 @@ export function idSegment(
 
 /** Where a Speak room's link points, built from its code. */
 export const SPEAK_ORIGIN = 'https://speak.kinescope.io';
+
+/** A project picked from the workspace's list, or given as an ID by expression. */
+export function projectProperty(overrides: Partial<INodeProperties> = {}): INodeProperties {
+	return {
+		displayName: 'Project Name or ID',
+		name: 'projectId',
+		type: 'options',
+		typeOptions: { loadOptionsMethod: 'getProjects' },
+		required: true,
+		default: '',
+		description:
+			'The project of the catalog. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+		...overrides,
+	};
+}
+
+/** A folder of the project chosen above, or none. */
+export function folderProperty(overrides: Partial<INodeProperties> = {}): INodeProperties {
+	return {
+		displayName: 'Folder Name or ID',
+		name: 'folderId',
+		type: 'options',
+		typeOptions: { loadOptionsMethod: 'getFolders', loadOptionsDependsOn: ['projectId'] },
+		default: '',
+		description:
+			'A folder inside that project; empty for the project root. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+		...overrides,
+	};
+}

@@ -38,6 +38,18 @@ export const loadOptions = {
 			.sort(byName);
 	},
 
+	async getFolders(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+		const project = String(this.getCurrentNodeParameter('projectId') ?? '').trim();
+		if (project === '' || project.startsWith('=')) return [];
+		return (await list.call(this, `/v1/projects/${encodeURIComponent(project)}/folders`))
+			.map((folder) => ({
+				name: String(folder.name ?? '').trim() || String(folder.id),
+				value: String(folder.id),
+				description: `${String(folder.items_count ?? 0)} items`,
+			}))
+			.sort(byName);
+	},
+
 	async getProjects(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
 		return (await list.call(this, '/v1/projects'))
 			.map((project) => ({

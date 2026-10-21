@@ -6,6 +6,7 @@ import {
 	compact,
 	idList,
 	orderProperty,
+	requiredText,
 	returnAllProperties,
 	text,
 	wantedRows,
@@ -13,7 +14,16 @@ import {
 import type { Resource } from '../../../shared/spec';
 import { errorItem } from '../../../shared/spec';
 import { dataOf, kinescopeRequest, readPages } from '../../../shared/transport';
-import { idProperty, idSegment } from '../props';
+import { folderProperty, idProperty, idSegment, projectProperty } from '../props';
+import { PRIVACY_TYPES } from './project';
+
+/**
+ * An upload header value. Headers carry Latin-1 only, so text is percent-encoded;
+ * Kinescope decodes it — a title such as "Встреча 21.10" arrives intact.
+ */
+function headerText(value: string): string {
+	return encodeURIComponent(value);
+}
 
 const VIDEO_STATUSES = [
 	{ name: 'Aborted', value: 'aborted' },
@@ -341,6 +351,142 @@ export const videoResource: Resource = {
 				},
 			],
 			executeAll: download,
+		},
+		{
+			value: 'update',
+			name: 'Update',
+			action: 'Update a video',
+			description:
+				'Change the title, description or embedding privacy of a video, e.g. rename a Speak recording after the meeting it holds',
+			properties: [
+				videoId,
+				{
+					displayName: 'Update Fields',
+					name: 'updateFields',
+					type: 'collection',
+					placeholder: 'Add Field',
+					default: {},
+					options: [
+						{ displayName: 'Description', name: 'description', type: 'string', default: '' },
+						{
+							displayName: 'Privacy',
+							name: 'privacyType',
+							type: 'options',
+							default: 'anywhere',
+							options: PRIVACY_TYPES,
+						},
+						{
+							displayName: 'Privacy Domains',
+							name: 'privacyDomains',
+							type: 'string',
+							default: '',
+							placeholder: 'example.com, school.example.com',
+							description: 'Domains that may embed the player, for Listed Domains Only',
+						},
+						{ displayName: 'Title', name: 'title', type: 'string', default: '' },
+					],
+				},
+			],
+			async execute(itemIndex) {
+				const id = idSegment(this, 'videoId', itemIndex, 'Video ID');
+				const fields = this.getNodeParameter('updateFields', itemIndex, {}) as IDataObject;
+				const body = compact({
+					title: String(fields.title ?? '').trim(),
+					description: fields.description as string | undefined,
+					privacy_type: fields.privacyType as string | undefined,
+					privacy_domains:
+						fields.privacyDomains === undefined ? undefined : idList(fields.privacyDomains),
+				});
+				return dataOf(
+					await kinescopeRequest.call(this, 'PATCH', `/v1/videos/${id}`, { body, itemIndex }),
+				);
+			},
+		},
+		{
+			value: 'move',
+			name: 'Move',
+			action: 'Move a video',
+			description:
+				'Move a video to another project or folder, e.g. a Speak recording out of Speak Records. Its ID and links stay the same.',
+			properties: [videoId, projectProperty(), folderProperty()],
+			async execute(itemIndex) {
+				const id = idSegment(this, 'videoId', itemIndex, 'Video ID');
+				const body = compact({
+					project_id: requiredText(this, 'projectId', itemIndex, 'Project'),
+					folder_id: text(this, 'folderId', itemIndex),
+				});
+				await kinescopeRequest.call(this, 'PUT', `/v1/videos/${id}/move`, { body, itemIndex });
+				return dataOf(await kinescopeRequest.call(this, 'GET', `/v1/videos/${id}`, { itemIndex }));
+			},
+		},
+		{
+			value: 'uploadFromUrl',
+			name: 'Upload From URL',
+			action: 'Upload a video from a URL',
+			description:
+				'Have Kinescope download a video from a direct link or a YouTube address into a project or folder. Returns at once with status uploading; Media: Status Updated tells when it is done.',
+			properties: [
+				projectProperty(),
+				folderProperty(),
+				{
+					displayName: 'Video URL',
+					name: 'url',
+					type: 'string',
+					required: true,
+					default: '',
+					placeholder: 'https://example.com/media/lesson-1.mp4',
+					description:
+						'A direct link to the file, reachable without signing in, or a YouTube address (youtube.com/watch?v=… or youtu.be/…)',
+				},
+				{
+					displayName: 'Title',
+					name: 'title',
+					type: 'string',
+					required: true,
+					default: '',
+				},
+				{
+					displayName: 'Additional Fields',
+					name: 'additionalFields',
+					type: 'collection',
+					placeholder: 'Add Field',
+					default: {},
+					options: [
+						{ displayName: 'Description', name: 'description', type: 'string', default: '' },
+						{
+							displayName: 'File Name',
+							name: 'fileName',
+							type: 'string',
+							default: '',
+							placeholder: 'lesson-1.mp4',
+						},
+					],
+				},
+			],
+			async execute(itemIndex) {
+				const fields = this.getNodeParameter('additionalFields', itemIndex, {}) as IDataObject;
+				const parent =
+					text(this, 'folderId', itemIndex) ||
+					requiredText(this, 'projectId', itemIndex, 'Project');
+				const headers: Record<string, string> = {
+					'X-Parent-ID': parent,
+					'X-Video-URL': requiredText(this, 'url', itemIndex, 'Video URL'),
+					'X-Video-Title': headerText(requiredText(this, 'title', itemIndex, 'Title')),
+				};
+				const description = String(fields.description ?? '').trim();
+				if (description !== '') headers['X-Video-Description'] = headerText(description);
+				const fileName = String(fields.fileName ?? '').trim();
+				if (fileName !== '') headers['X-File-Name'] = headerText(fileName);
+				// A repeat after a timeout would import the video twice: no retry.
+				return dataOf(
+					await kinescopeRequest.call(this, 'POST', '/v2/video', {
+						uploader: true,
+						headers,
+						itemIndex,
+						retry: false,
+					}),
+				);
+			},
 		},
 		{
 			value: 'delete',

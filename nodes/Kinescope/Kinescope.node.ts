@@ -12,10 +12,13 @@ import { CREDENTIAL } from '../../shared/transport';
 import { loadOptions } from './methods';
 import { callResource } from './resources/call';
 import { customRequestResource } from './resources/customRequest';
+import { folderResource } from './resources/folder';
 import { participantResource } from './resources/participant';
+import { projectResource } from './resources/project';
 import { restreamResource } from './resources/restream';
 import { roomResource } from './resources/room';
 import { signingKeyResource } from './resources/signingKey';
+import { subtitleResource } from './resources/subtitle';
 import { userResource } from './resources/user';
 import { videoResource } from './resources/video';
 import { webhookResource } from './resources/webhook';
@@ -26,6 +29,9 @@ const resources: Resource[] = [
 	callResource,
 	restreamResource,
 	videoResource,
+	subtitleResource,
+	projectResource,
+	folderResource,
 	userResource,
 	webhookResource,
 	signingKeyResource,
@@ -47,7 +53,7 @@ export class Kinescope implements INodeType {
 		usableAsTool: true,
 		builderHint: {
 			searchHint:
-				'Kinescope is a video hosting platform; Speak is its video meeting tool. Room → Create needs an owner ID from User → Get Many and returns the link people join by; recording and transcription can start automatically. Each meeting held in a room is a Call: Call → Download Transcript gives phrases with speaker and time, or talk time per speaker, once Get Transcript reports status done. Meeting recordings land in the catalog as videos: Video → Download gets the original file or a signed link for Google Drive, Yandex Disk or S3; duration is in seconds. Automatic recording starts only when the owner joins; Room → Get Admin Link signs a link that lets a host in as admin, after the signing key of the credential is registered once with Signing Key → Register. Who joined a meeting is not in the API, only in Speak webhooks. Custom Request reaches every other route. Tokens are per workspace.',
+				'Kinescope is a video hosting platform; Speak is its video meeting tool. Room → Create needs an owner ID from User → Get Many and returns the link people join by; recording and transcription can start automatically. Each meeting held in a room is a Call: Call → Download Transcript gives phrases with speaker and time, or talk time per speaker, once Get Transcript reports status done. Meeting recordings land in the catalog as videos: Video → Download gets the original file or a signed link for Google Drive, Yandex Disk or S3; duration is in seconds. Automatic recording starts only when the owner joins; Room → Get Admin Link signs a link that lets a host in as admin, after the signing key of the credential is registered once with Signing Key → Register. Subtitle → Generate (Wait for Recognition on) then Subtitle → Download as Text gives the text of a recording without speaker names. Video → Update renames a recording, Video → Move files it into a project or folder from Project → Get Many and Folder → Get Many. Who joined a meeting is not in the API, only in Speak webhooks. Custom Request reaches every other route. Tokens are per workspace.',
 			relatedNodes: [
 				{
 					nodeType: 'n8n-nodes-kinescope.kinescopeTrigger',

@@ -1,16 +1,17 @@
 # n8n-nodes-kinescope
 
 n8n community nodes for [Kinescope](https://kinescope.io), the video hosting platform, and Speak,
-its video meeting tool. An action node with 31 operations across 9 resources — Speak rooms and
+its video meeting tool. An action node with 46 operations across 12 resources — Speak rooms and
 signed admin links to them, participants, calls with their recordings and transcripts, restream
-destinations, catalog videos with download, users, webhooks and signing keys, plus a Custom Request
-for every other route — and a trigger that subscribes itself to Kinescope's webhooks.
+destinations, catalog videos with download, upload by URL, editing and moving, subtitles by speech
+recognition, projects and folders, users, webhooks and signing keys, plus a Custom Request for every
+other route — and a trigger that subscribes itself to Kinescope's webhooks.
 
 Written from scratch against the official documentation
 ([docs.kinescope.com/api](https://docs.kinescope.com/api/speak/), read on 22.10.2026). No code from
 any other package.
 
-**Status: 0.2.0.** Every operation ran against a live Kinescope workspace, the trigger included;
+**Status: 0.3.0.** Every operation ran against a live Kinescope workspace, the trigger included;
 the two transcript operations ran but never met a transcript. See [What was checked](#what-was-checked). Where Kinescope behaves differently from its
 documentation, this README says so.
 
@@ -58,7 +59,10 @@ operations lack.
 | Participant | Add, Get, Get Many, Update, Remove |
 | Call | Get, Get Many, Get Recordings, Get Transcript, Download Transcript |
 | Restream Destination | Get Many, Update |
-| Video | Get, Get Many, Download, Delete |
+| Video | Get, Get Many, Download, Update, Move, Upload From URL, Delete |
+| Subtitle | Generate, Get, Get Many, Download, Upload, Update, Delete |
+| Project | Create, Get, Get Many |
+| Folder | Create, Get Many |
 | User | Get Many |
 | Webhook | Create, Get Many, Update, Delete |
 | Signing Key | Register, Get Many, Delete |
@@ -133,6 +137,26 @@ For a Speak recording Kinescope lists `file_size` of the video stream alone, whi
 audio too and downloads larger. The node passes the figure on as `listedFileSize`
 rather than pretending it is the file's size.
 
+**Video → Update** changes the title, description and embedding privacy; **Move** puts a video into
+another project or folder, its ID and links unchanged. **Upload From URL** has Kinescope fetch a file
+from a direct link or a YouTube address and returns at once with status `uploading`. Upload headers
+carry Latin-1 only, so the node percent-encodes the title, description and file name, and Kinescope
+decodes them: a title with Cyrillic, guillemets, `&` and `%` arrived intact. Uploading a file from
+n8n itself is not here yet.
+
+**Subtitle → Generate** has Kinescope recognise the speech of a video, one track per language code.
+Kinescope answers at once with the tracks `pending`; with Wait for Recognition on, the node polls
+every ten seconds until they are `done`. A 16-second clip of Russian speech was done within the
+first poll and came back word for word, without punctuation and without speaker names. **Download**
+gives the cues as items with start and end in seconds, the text, or a VTT or SRT file. **Upload**
+attaches a VTT or SRT file from binary data. Kinescope rejects an audio-only file as a video, so the
+check used a video with sound. What recognition costs is not in Kinescope's API reference; see your
+plan.
+
+**Project** and **Folder** list and create the places videos live in; Move and Upload From URL pick
+them from dropdowns. Kinescope returns a project's privacy domains as record IDs, not as the domain
+names sent.
+
 **Webhook.** Kinescope returns the Basic Auth password of a webhook in plain text, though its
 reference shows it redacted; Get Many leaves it out unless Include Password is on. Kinescope's update
 replaces the whole webhook and refuses an empty endpoint or event list, so Update reads the current
@@ -190,6 +214,13 @@ into n8n's binary storage either way.
 
 From the other side — a call ID in hand — **Call → Get Recordings** finds its videos.
 
+To keep the recording tidy, **Video → Update** gives it a title after the meeting and **Video → Move**
+takes it out of `Speak Records` into the project or folder it belongs in.
+
+For the text of the meeting, **Subtitle → Generate** with Wait for Recognition on and then
+**Subtitle → Download** as Text. It is speech recognition of the recording — one stream of text with
+no speaker names — and works where Speak's own transcript does not appear, see below.
+
 A recording a few seconds long and without sound ended in status `error` with no files; a longer one
 with sound went through.
 
@@ -215,14 +246,16 @@ What Kinescope's API gives today:
 
 ## Not here, or not known
 
-- **Transcripts were not seen.** Automatic Transcription was on in the test room, yet no call got a
-  transcript: `transcript_id` stayed empty. Like automatic recording it may wait for the owner. Get
-  Transcript and Download Transcript are written to the reference and its example
-  (`[MM:SS.T-MM:SS.T] Speaker: Text`) and are untested against a real transcript.
+- **Speak transcripts were not seen.** Automatic Transcription was on in the test room, yet no call
+  got a transcript: `transcript_id` stayed empty. Like automatic recording it may wait for the owner.
+  Get Transcript and Download Transcript are written to the reference and its example
+  (`[MM:SS.T-MM:SS.T] Speaker: Text`) and are untested against a real transcript. Subtitle → Generate
+  on the recording gives the text without speakers.
 - Restream destinations cannot be started, stopped, added to an existing room or removed one by one
   through the API; the room interface does that.
-- Live events, playlists, players, analytics and uploads are reachable through Custom Request only.
-  The uploader host `uploader.kinescope.io` is not: Custom Request is fixed to `api.kinescope.io`.
+- Live events, playlists, players and analytics are reachable through Custom Request only. Uploading
+  a file from n8n is not: the uploader host takes only Upload From URL here, and Custom Request is
+  fixed to `api.kinescope.io`.
 
 ## What was checked
 
@@ -239,6 +272,9 @@ runtime:
   video and an audio track; Video → Delete on the test recordings;
 - the trigger's registration, re-registration and removal against the API, and a real Kinescope
   delivery with its Basic Auth header;
+- Subtitle, Project, Folder and Video → Update, Move and Upload From URL in a test project, its
+  videos and folders deleted afterwards: recognition of a Russian speech clip, every download format,
+  an SRT uploaded and read back;
 - the generated signing key in n8n 2.38.5 itself: made on the first request, the same key in later
   executions and after the credential was saved again from the editor, blanked out in the editor;
 - the error texts for a malformed ID, a missing call, a refused event, a sort field Kinescope does not
