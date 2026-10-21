@@ -1,0 +1,30 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+.env.*
+*.log
+.DS_Store
+.idea/
+*.tgz
+.vscode/
+Thumbs.db
+desktop.ini
+
+# Never publishable, and each of these has been created in a package directory
+# by somebody at some point. `git add -A` is the moment they would be swept in.
+.npmrc
+.secrets/
+secrets/
+*.pem
+*.key
+id_*
+_probes/
+probe-out/
+out/
+*.har
+
+# Agent instructions: local only. This repository is public; the internal
+# conventions, release steps and layout notes in these files are not for it.
+AGENTS.md
+CLAUDE.md

@@ -1,0 +1,8 @@
+# The working tree keeps LF on every platform: .editorconfig and prettier
+# (endOfLine: 'lf') both demand it, and a Windows checkout with core.autocrlf=true
+# would otherwise hand the next `npm run format` a repo-wide diff.
+* text=auto eol=lf
+
+# Binary-ish assets git must not touch.
+*.svg text eol=lf
+*.png binary

@@ -1,0 +1,73 @@
+{
+	"name": "n8n-nodes-kinescope",
+	"version": "0.1.0",
+	"description": "Kinescope nodes for n8n: Speak video meeting rooms, participants, calls and transcripts, restream destinations, videos with download of the original file, webhooks, any API call, and a trigger for Speak, video and live stream events",
+	"keywords": [
+		"n8n-community-node-package",
+		"n8n",
+		"kinescope",
+		"kinescope speak",
+		"speak",
+		"video meeting",
+		"video call",
+		"webinar",
+		"meeting recording",
+		"transcript",
+		"video hosting",
+		"live stream",
+		"restream"
+	],
+	"license": "MIT",
+	"homepage": "https://github.com/zenland-dev/n8n-nodes-kinescope",
+	"author": {
+		"name": "zenland-dev",
+		"email": "zenland.dev@gmail.com"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/zenland-dev/n8n-nodes-kinescope.git"
+	},
+	"bugs": {
+		"url": "https://github.com/zenland-dev/n8n-nodes-kinescope/issues"
+	},
+	"engines": {
+		"node": ">=20.19"
+	},
+	"main": "index.js",
+	"scripts": {
+		"build": "n8n-node build",
+		"dev": "n8n-node dev",
+		"lint": "n8n-node lint",
+		"lint:fix": "n8n-node lint --fix",
+		"format": "prettier nodes credentials shared --write",
+		"release": "n8n-node release",
+		"prepublishOnly": "n8n-node prerelease"
+	},
+	"files": [
+		"dist"
+	],
+	"n8n": {
+		"n8nNodesApiVersion": 1,
+		"strict": true,
+		"credentials": [
+			"dist/credentials/KinescopeWorkspaceApi.credentials.js"
+		],
+		"nodes": [
+			"dist/nodes/Kinescope/Kinescope.node.js",
+			"dist/nodes/KinescopeTrigger/KinescopeTrigger.node.js"
+		]
+	},
+	"devDependencies": {
+		"@n8n/node-cli": "^0.46.4",
+		"eslint": "9.39.4",
+		"prettier": "3.8.3",
+		"release-it": "^19.0.4",
+		"typescript": "5.9.3"
+	},
+	"peerDependencies": {
+		"n8n-workflow": "*"
+	},
+	"publishConfig": {
+		"access": "public"
+	}
+}

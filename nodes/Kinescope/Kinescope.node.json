@@ -1,0 +1,42 @@
+{
+	"node": "n8n-nodes-kinescope.kinescope",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Communication", "Marketing & Content"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://github.com/zenland-dev/n8n-nodes-kinescope?tab=readme-ov-file#credentials"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://github.com/zenland-dev/n8n-nodes-kinescope?tab=readme-ov-file#kinescope-node"
+			}
+		]
+	},
+	"alias": [
+		"Kinescope",
+		"Кинескоп",
+		"Speak",
+		"Kinescope Speak",
+		"Video Meeting",
+		"Видеовстреча",
+		"Video Call",
+		"Видеозвонок",
+		"Созвон",
+		"Webinar",
+		"Вебинар",
+		"Meeting Recording",
+		"Запись встречи",
+		"Transcript",
+		"Расшифровка",
+		"Транскрипция",
+		"Video",
+		"Видео",
+		"Video Hosting",
+		"Видеохостинг",
+		"Restream",
+		"Рестрим"
+	]
+}

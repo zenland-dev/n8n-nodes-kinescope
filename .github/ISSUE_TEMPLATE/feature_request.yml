@@ -1,0 +1,25 @@
+name: Feature request
+description: A missing route, field or convenience
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you are trying to do
+      description: The workflow you are building, not only the call you are missing.
+    validations:
+      required: true
+
+  - type: input
+    id: route
+    attributes:
+      label: The Kinescope route, if you know it
+      placeholder: "GET /v1/playlists"
+
+  - type: textarea
+    id: docs
+    attributes:
+      label: Where it is documented
+      description: >
+        A link to docs.kinescope.com. Until a route has an operation of its own, Custom Request of
+        the Kinescope node calls it with the same token and rate limit.

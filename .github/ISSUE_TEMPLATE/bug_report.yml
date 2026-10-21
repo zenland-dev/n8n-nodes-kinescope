@@ -1,0 +1,60 @@
+name: Bug report
+description: Something in the nodes behaves differently than documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Issues here are public. Remove the API token, room links and codes, room, call, video and
+        user IDs, restream stream keys, and strip participant names, emails and transcript text out
+        of any sample before pasting it.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+    validations:
+      required: true
+
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: The n8n version and the version of this package.
+      placeholder: "n8n 2.3.1, n8n-nodes-kinescope 0.1.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: node
+    attributes:
+      label: Which node
+      options:
+        - Kinescope
+        - Kinescope Trigger
+    validations:
+      required: true
+
+  - type: input
+    id: operation
+    attributes:
+      label: Resource and operation
+      placeholder: "Call → Download Transcript"
+
+  - type: textarea
+    id: response
+    attributes:
+      label: What Kinescope answered
+      description: >
+        The error text the node showed, with the code in square brackets, e.g.
+        "Kinescope GET /v1/speak/rooms/…: not found [400404]".
+      render: text
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: >
+        For the trigger: Registration (Automatic or Manual), the events selected, and one sample
+        delivery with the personal data removed.

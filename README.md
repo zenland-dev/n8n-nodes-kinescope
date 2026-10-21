@@ -1,0 +1,240 @@
+# n8n-nodes-kinescope
+
+n8n community nodes for [Kinescope](https://kinescope.io), the video hosting platform, and Speak,
+its video meeting tool. An action node with 31 operations across 9 resources — Speak rooms and
+signed admin links to them, participants, calls with their recordings and transcripts, restream
+destinations, catalog videos with download, users, webhooks and signing keys, plus a Custom Request
+for every other route — and a trigger that subscribes itself to Kinescope's webhooks.
+
+Written from scratch against the official documentation
+([docs.kinescope.com/api](https://docs.kinescope.com/api/speak/), read on 22.10.2026). No code from
+any other package.
+
+**Status: 0.1.0.** Every operation ran against a live Kinescope workspace, the trigger included;
+the two transcript operations ran but never met a transcript. See [What was checked](#what-was-checked). Where Kinescope behaves differently from its
+documentation, this README says so.
+
+- [Installation](#installation)
+- [Credentials](#credentials)
+- [Kinescope node](#kinescope-node)
+- [Kinescope Trigger](#kinescope-trigger)
+- [Meeting recordings to a disk](#meeting-recordings-to-a-disk)
+- [Who was in a meeting, and for how long](#who-was-in-a-meeting-and-for-how-long)
+- [Not here, or not known](#not-here-or-not-known)
+- [What was checked](#what-was-checked)
+
+## Installation
+
+In n8n: **Settings → Community Nodes → Install**, package name `n8n-nodes-kinescope`.
+
+For a self-hosted instance without the UI installer:
+
+```bash
+cd ~/.n8n/nodes
+npm install n8n-nodes-kinescope
+```
+
+and restart n8n.
+
+## Credentials
+
+**Kinescope API** takes one API token, from Settings → API tokens in Kinescope. A token belongs to
+one workspace, and Kinescope finds the workspace from the token alone, so there is nothing else to
+fill in. A token pasted with `Bearer ` in front of it works too.
+
+The host is fixed at `https://api.kinescope.io`. The credential cannot be picked in an HTTP Request
+node: its *Allowed HTTP Request Domains* setting is pinned to none, so the token cannot be sent to
+another server by pointing a generic node at it. Use **Custom Request** for a route the other
+operations lack.
+
+**Signing Private Key** and **Signing Key ID** are optional and serve Room → Get Admin Link only; see
+[Admin links](#admin-links).
+
+## Kinescope node
+
+| Resource | Operations |
+|---|---|
+| Room | Create, Get, Get Many, Update, Delete, Get Admin Link |
+| Participant | Add, Get, Get Many, Update, Remove |
+| Call | Get, Get Many, Get Recordings, Get Transcript, Download Transcript |
+| Restream Destination | Get Many, Update |
+| Video | Get, Get Many, Download, Delete |
+| User | Get Many |
+| Webhook | Create, Get Many, Update, Delete |
+| Signing Key | Register, Get Many, Delete |
+| Custom Request | Request |
+
+**Room.** A Speak room is a link people join by; it can host any number of meetings. Create needs an
+owner, a user of the workspace — pick one from the list, which comes from `GET /v1/users`. That route
+is not in Kinescope's reference, but it is the only one that names users, and the owner field cannot
+be filled without it. The list route returns rooms with an empty `link`; the node fills it in from
+the room code.
+
+Waiting Room and Wait for Host can only be set when a room is created: Kinescope accepts them in an
+update and changes nothing. Automatic Recording and Automatic Transcription can be changed later.
+
+### Admin links
+
+Room → Get Admin Link signs a Speak link that lets whoever opens it into the room as admin, without
+a Kinescope account: they can start recording, admit people from the waiting room, manage access.
+It is the token of Kinescope's
+[Speak login link](https://docs.kinescope.com/developer-guides/speak-admin-login-link/) — RS256,
+`aud: speak`, the room code, `role: admin` — signed in n8n with a private key Kinescope never sees.
+
+1. Make an RSA key: `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out speak.pem`.
+2. Paste the file's content into **Signing Private Key** of the credential and give it a **Signing
+   Key ID**, any name unique in the workspace. A PEM pasted into the one-line field loses its line
+   breaks; the node puts them back.
+3. Run **Signing Key → Register** once, with an expiry date (Kinescope requires one). It sends
+   Kinescope the public half only.
+4. **Room → Get Admin Link** with Valid For in minutes; keep it close to the meeting's length.
+
+Anyone holding such a link is admin of that room until it expires — send it to the host, not to a
+channel. Signing Key → Delete stops every link signed with the key at once. Kinescope uses the same
+keys for stream chat tokens, telling them apart by `aud`.
+
+**Participant** is a workspace user given a role in a room ahead of a meeting: Admin or Manager, both
+need a user ID, and a user can be added once. The owner is in the room already. Update changes the
+name only; Kinescope ignores a new role.
+
+**Call** is one meeting held in a room. Kinescope returns little about it: its ID, the transcript ID,
+`created_at` and `updated_at`. In every call observed `updated_at` was the moment the call ended.
+
+- **Get Recordings** finds the videos recorded during a call. Kinescope links them nowhere — a video
+  has no room or call ID — so the node matches the title Kinescope gives a Speak recording,
+  `Record <room name> <YYYY-MM-DD HH:MM:SS>`, against the room name and the call's time span. A room
+  renamed after the meeting is not found this way.
+- **Download Transcript** works once Get Transcript reports status `done`, and outputs one item per
+  phrase (speaker, text, start and end in seconds), talk time per speaker, the whole text, or a .txt
+  file.
+
+**Restream Destination.** Up to 15 per room, added only when the room is created. Kinescope returns
+stream keys in plain text; the node leaves them out of every output unless Include Stream Key is on.
+
+**Video → Download** fetches a file of a catalog video into binary data, or returns just its signed
+link (Mode: Link Only).
+
+- **Best MP4** (the default) is the encoded MP4 with the highest resolution.
+- **Original** is the file as uploaded. Speak recordings have none once processed — only encoded MP4s
+  and an audio track.
+- **Audio Only** is the audio track as M4A, e.g. for a speech-to-text service.
+
+For a Speak recording Kinescope lists `file_size` of the video stream alone, while the MP4 carries the
+audio too and downloads larger. The node passes the figure on as `listedFileSize`
+rather than pretending it is the file's size.
+
+**Webhook.** Kinescope returns the Basic Auth password of a webhook in plain text, though its
+reference shows it redacted; Get Many leaves it out unless Include Password is on. Kinescope's update
+replaces the whole webhook and refuses an empty endpoint or event list, so Update reads the current
+values and changes only the fields you set.
+
+**Custom Request** sends any method to any path under `api.kinescope.io` with the same token, rate
+limit and error messages. A query parameter named `status[]` is sent as a list, the way Kinescope's
+filters want; Follow Pages reads every page of a list route.
+
+### Rate limit
+
+Kinescope publishes 10 requests a second and 300 a minute per token, and its own reference says the
+figures do not hold in practice. The nodes stay under 10 a second per token, shared by every workflow
+in the n8n process, and wait 5 seconds after a 429 — Kinescope sends no `Retry-After`. A POST that
+timed out is not repeated: Kinescope has no idempotency key, and a second POST would make a second
+room or webhook.
+
+## Kinescope Trigger
+
+Starts a workflow on the events chosen, one item per delivery: `event`, `receivedAt` and the fields
+Kinescope sent. Kinescope's events carry no time of their own, so `receivedAt` — when n8n got the
+delivery — is the closest there is.
+
+On **Automatic** the trigger creates a webhook to its own address when the workflow is activated and
+deletes it when the workflow is deactivated; a webhook to the same address left from an earlier
+activation is updated rather than duplicated. Kinescope signs nothing, so the trigger registers a
+Basic Auth login and password derived from the token and refuses any delivery without them with
+401. Kinescope does send them: a real delivery carried `Authorization: Basic` with exactly the
+credentials of the webhook. On **Manual** it leaves Kinescope alone and checks nothing.
+
+Options narrow what starts the workflow: **Video Statuses** for Media: Status Updated (Done is the
+moment a file can be downloaded), **Room IDs** for Speak events.
+
+**The Speak events cannot be subscribed to yet.** Kinescope documents six of them — call started and
+finished, participant joined and left, recording started and finished — but on 22.10.2026 its webhook
+route refused them: it accepts `media.update.status` and the six `live.*` events only. They stay in the
+list for when Kinescope enables them; until then picking one fails activation with an error that says
+so. Ask Kinescope support if you need them.
+
+## Meeting recordings to a disk
+
+A Speak recording becomes an ordinary catalog video in a project Kinescope names `Speak Records` and
+creates with the first recording. It goes through Media: Status Updated as `pre-processing`,
+`processing`, `done`; for a short meeting `done` came within a minute of its end.
+
+1. **Kinescope Trigger**, event Media: Status Updated, Video Statuses: Done.
+2. **Kinescope → Video → Get** with `{{ $json.id }}`; an IF on the title starting with `Record ` keeps
+   Speak recordings only. `duration` is in seconds.
+3. **Kinescope → Video → Download**, Best MP4, into binary data, then the Google Drive, Dropbox or S3
+   node. For Yandex Disk, Mode: Link Only and Yandex's upload by URL let the file skip n8n entirely.
+
+Long meetings make large files. n8n holds binary data in memory unless `N8N_DEFAULT_BINARY_DATA_MODE`
+is `filesystem` (or S3); set it before moving hour-long recordings. The node streams the download
+into n8n's binary storage either way.
+
+From the other side — a call ID in hand — **Call → Get Recordings** finds its videos.
+
+A recording a few seconds long and without sound ended in status `error` with no files; a longer one
+with sound went through.
+
+**Automatic recording starts only when the room owner joins**, signed in to Kinescope. A participant
+who joins as admin through a JWT link
+([Speak login link](https://docs.kinescope.com/developer-guides/speak-admin-login-link/)) can start
+recording by hand, but automatic recording does not start for them, and the API has no way to start
+or stop a recording.
+
+## Who was in a meeting, and for how long
+
+What Kinescope's API gives today:
+
+- **During a call**, Room → Get lists in `participants` everyone connected: the name they joined
+  with, the role (`guest` for anyone who came by link) and when they joined. Each new connection is
+  an entry, so one person can appear more than once. The list empties when the call ends and
+  holds no leave times. Getting one such guest by its ID through Participant → Get answers 500.
+- **After a call**, Call → Get gives its start and, as `updated_at`, its end; Video → Get gives the
+  recording's `duration`; Download Transcript with Talk Time per Speaker gives who spoke and for how
+  long.
+- Who joined and left, with times, is what the `speak.participant.*` webhooks are for — which
+  Kinescope does not yet accept, see above.
+
+## Not here, or not known
+
+- **Transcripts were not seen.** Automatic Transcription was on in the test room, yet no call got a
+  transcript: `transcript_id` stayed empty. Like automatic recording it may wait for the owner. Get
+  Transcript and Download Transcript are written to the reference and its example
+  (`[MM:SS.T-MM:SS.T] Speaker: Text`) and are untested against a real transcript.
+- Restream destinations cannot be started, stopped, added to an existing room or removed one by one
+  through the API; the room interface does that.
+- Live events, playlists, players, analytics and uploads are reachable through Custom Request only.
+  The uploader host `uploader.kinescope.io` is not: Custom Request is fixed to `api.kinescope.io`.
+
+## What was checked
+
+On a live Kinescope workspace, 22.10.2026, by running the compiled nodes inside a stand-in for n8n's
+runtime:
+
+- every operation of Room, Participant, Restream Destination, User, Webhook, Signing Key and Custom
+  Request, the writes on test rooms, webhooks and keys created for the purpose and deleted afterwards;
+- an admin link of the same shape as Get Admin Link signs let a person into a room as admin, with the
+  record button; the node's own links were checked against the public key;
+- Call → Get, Get Many and Get Recordings on real meetings, each matched to its recording or to
+  none;
+- Video → Get, Get Many and Download in all modes, a whole recording downloaded and found to hold a
+  video and an audio track; Video → Delete on the test recordings;
+- the trigger's registration, re-registration and removal against the API, and a real Kinescope
+  delivery with its Basic Auth header;
+- the error texts for a malformed ID, a missing call, a refused event, a sort field Kinescope does not
+  take, and a file a video does not have.
+
+Not seen working: the two transcript operations, for the reason above.
+
+## License
+
+[MIT](LICENSE.md). Kinescope and its logo are trademarks of their owner; see the trademark note in the
+license.
