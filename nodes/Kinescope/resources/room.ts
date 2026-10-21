@@ -8,7 +8,7 @@ import {
 	text,
 	wantedRows,
 } from '../../../shared/params';
-import { signingKey, signJwt } from '../../../shared/jwt';
+import { ensureRegistered, signingKey, signJwt } from '../../../shared/jwt';
 import type { Resource } from '../../../shared/spec';
 import { dataOf, kinescopeRequest, readPages } from '../../../shared/transport';
 import { idSegment, roomProperty, SPEAK_ORIGIN, userProperty } from '../props';
@@ -361,7 +361,7 @@ export const roomResource: Resource = {
 			name: 'Get Admin Link',
 			action: 'Get an admin link to a room',
 			description:
-				'Sign a Speak link that lets whoever opens it into the room as admin: recording, access control, the waiting room. Needs the signing key of the credential, registered with Signing Key → Register.',
+				'Sign a Speak link that lets whoever opens it into the room as admin: recording, access control, the waiting room. The first link registers the signing key of the credential with Kinescope.',
 			properties: [
 				roomProperty(),
 				{
@@ -375,10 +375,13 @@ export const roomResource: Resource = {
 				},
 			],
 			async execute(itemIndex) {
-				const { key, kid } = await signingKey.call(this, itemIndex);
+				// The room is read first: the first request with a credential is what makes
+				// n8n generate and store its signing key, which is read only after it.
 				const room = dataOf(
 					await kinescopeRequest.call(this, 'GET', roomPath(this, itemIndex), { itemIndex }),
 				);
+				const { key, kid } = await signingKey.call(this, itemIndex);
+				await ensureRegistered.call(this, key, kid, itemIndex);
 				const code = String(room.code ?? '').trim();
 				const minutes = Math.max(
 					1,

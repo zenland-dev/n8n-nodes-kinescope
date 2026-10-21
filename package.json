@@ -1,6 +1,6 @@
 {
 	"name": "n8n-nodes-kinescope",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "Kinescope nodes for n8n: Speak video meeting rooms, participants, calls and transcripts, restream destinations, videos with download of the original file, webhooks, any API call, and a trigger for Speak, video and live stream events",
 	"keywords": [
 		"n8n-community-node-package",

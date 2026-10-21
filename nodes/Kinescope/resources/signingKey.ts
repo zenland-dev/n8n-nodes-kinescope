@@ -22,7 +22,7 @@ export const signingKeyResource: Resource = {
 			name: 'Register',
 			action: 'Register the credential signing key',
 			description:
-				'Give Kinescope the public half of the private key in the credential, under its Signing Key ID, so that Room → Get Admin Link works. Do this once per key.',
+				'Give Kinescope the public half of the signing key of the credential with an expiry of your choice. Optional: the first Room → Get Admin Link registers the key by itself, valid for 100 years.',
 			properties: [
 				{
 					displayName: 'Expires At',
@@ -35,15 +35,27 @@ export const signingKeyResource: Resource = {
 				},
 			],
 			async execute(itemIndex) {
+				// The list is read first: the first request with a credential is what makes
+				// n8n generate and store its key.
+				const keys = await readPages.call(this, '/v1/jwk', {}, undefined, itemIndex);
 				const { key, kid } = await signingKey.call(this, itemIndex);
+				const jwk = publicJwk(key, kid);
+
+				const existing = keys.find((entry) => String(entry.kid) === kid);
+				if (existing !== undefined) {
+					if (String(existing.n) === String(jwk.n)) return { ...existing, alreadyRegistered: true };
+					throw new NodeOperationError(this.getNode(), `Another key is registered as ${kid}`, {
+						itemIndex,
+						description:
+							'Give the credential another Signing Key ID, or delete the old key with Signing Key → Delete first.',
+					});
+				}
+
 				const expires = new Date(requiredText(this, 'expiresAt', itemIndex, 'Expires At'));
 				if (Number.isNaN(expires.getTime())) {
 					throw new NodeOperationError(this.getNode(), 'Expires At is not a date', { itemIndex });
 				}
-				const body = {
-					...publicJwk(key, kid),
-					expires_at: expires.toISOString().replace(/\.\d+Z$/, 'Z'),
-				};
+				const body = { ...jwk, expires_at: expires.toISOString().replace(/\.\d+Z$/, 'Z') };
 				return dataOf(
 					await kinescopeRequest.call(this, 'POST', '/v1/jwk', { body, itemIndex, retry: false }),
 				);
@@ -64,7 +76,7 @@ export const signingKeyResource: Resource = {
 			name: 'Delete',
 			action: 'Delete a signing key',
 			description:
-				'Remove a public key: every link and chat token signed with it stops working at once. Use it when a private key leaked.',
+				'Remove a public key: every link and chat token signed with it stops working at once. After a leak, replace the credential first — a credential still holding the key registers it again with its next admin link.',
 			properties: [
 				idProperty(
 					'Key Record ID',
